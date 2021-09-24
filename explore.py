@@ -1,6 +1,5 @@
 import pandas as pd
-import acquire as aq
-import prepare as pr
+import wrangle as wr
 
 import re
 import itertools
@@ -111,10 +110,6 @@ def relplot_pairs(df):
     '''
     pairs, u_pairs, cq_pairs = pairing(df)
     for pair in u_pairs:
-        # # i starts at 0, but plot nos should start at 1
-        # plot_number = i + 1 
-        # # subplotting based on index
-        # plt.subplot(1, len(cq_pairs), plot_number)
         sns.relplot(x= pair[0], y= pair[1], data=df)
         plt.title(f'{pair[0]} vs {pair[1]}')
         plt.show()
@@ -184,26 +179,28 @@ def heatmap_combos(df):
             print('_____________________________________________')
 
 
-def scaling(train, validate, test, scaler_type = sklearn.preprocessing.StandardScaler()):
+def scaling(train, validate, test, scaler_type = sklearn.preprocessing.MinMaxScaler()):
     """
-    Takes in X_train, X_validate and X_test dfs with numeric values only
-    Returns scaler, X_train_scaled, X_validate_scaled, X_test_scaled dfs
+    Takes in train, validate and test dfs
+    Returns scaler, train_scaled, validate_scaled, test_scaled dfs
     """
+    # Lists all columns with int or float dtypes
+    num_vars = list(train.select_dtypes('number').columns)
 
+    # Chooses scaler to use
     scaler = scaler_type
+
+    train[num_vars] = scaler.fit_transform(train[num_vars], index = train.index, columns = train.columns)
+    valid[num_vars] = scaler.transform(valid[num_vars], index = validate.index, columns = validate.column)
+    test[num_vars] = scaler.transform(test[num_vars], index = test.index, columns = test.columns)
     
-    scaler.fit(train)
-    train_scaled = pd.DataFrame(scaler.transform(train), index = train.index, columns = train.columns)
-    validate_scaled = pd.DataFrame(scaler.transform(validate), index = validate.index, columns = validate.columns)
-    test_scaled = pd.DataFrame(scaler.transform(test), index = test.index, columns = test.columns)
-    
-    return train_scaled, validate_scaled, test_scaled
+    return scaler, train_scaled, validate_scaled, test_scaled
 
 ###################################         EXPOLORE FUNCS         ###################################
 
 def plot_categorical_and_continuous_vars(train, validate, test):
     ''' 
-    Scales data and plots numerous visualizations
+    Takes in train, validate and testcales data and plots numerous visualizations
     '''
     df = scaling(train, validate, test)[0]
     print('Histograms for each feature')
