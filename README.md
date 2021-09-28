@@ -53,6 +53,17 @@ month_sold |    tax rate of a property, derrived from (yearly_tax / tax_value) *
 ## Hypotheses:
 >   - $H_{i}$: The key drivers of log error will be linked to tax value and area
 
+## Key Takeaways:
+> - Despite beating the baseline RMSE by a few hundredths, the overall significance means the model
+explains very little of the error. Overall, the models preformance is lackluster and mostly insignificant.
+None of the clusters I created were especially useful and usually ranked last in feature rank on RFE rankings.
+> - Difficult to find a meaningful driver of logerror with clusters or engineered features.
+
+# Conclusion:
+## My reccomendation
+> - I reccomend to stick with existing zestimate algorithm and not rely on the features presented here to predict the logerror of the zestimate as almost all of the models I made failed to beat baseline RMSE and even the one that did failed to present meaningful significance.
+If given more time
+> - I would like to try more combinations of features, perhaps some that I dropped were indicative of logerror. Additionally, I would like to take more time to create features from the existing features and use those in clustering. Overall, I would like to tune my model in order to see an increase in the preformance of my model in both RMSE compared to baseline and R^2 significance.
 
 ## Plan:
 - [x] Create repo on github to save all files related to the project.
