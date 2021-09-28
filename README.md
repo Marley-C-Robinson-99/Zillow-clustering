@@ -14,22 +14,40 @@ log_error    | The logarithmic error of the existing Zestimate | float64
 
 Categorical Features   | Description |    Data Type
 --|--|--
+quality_id | A numeric representation of quality | int64
+heating_type |    Type of heating that a property uses    | object
 bedrooms    |   Count of bedrooms per property | float64
 bathrooms    |   Count of bathrooms per property | float64
-year_built |    Year a home was constructed    | object
-taxamount |    Amount paid in taxes so far   | float64
-fips |        Numeric county code    | object
+city_id    | Numeric id for the city of each property | int64
+county_id    | Numeric id for the county of each property | object
+zip_code    | Zip code of each property | int64
+roomcnt    | Spare room count of each property | int64
 
+
+Date/Time Features  | Description | Data Type
+--|--|--
+sale_date    | Date that the trasnaction of the property was finalized | object, datetime64[ns]
+year_built |    Year a home was constructed    | int64
 
 Continuous Features | Description | Data Type
 --|--|--
-area | Internal square footage of a home | float64
+home_area    |   Area of the actual home in square feet | float64
+lot_area    |   Area of the property lot in square feet | float64
+latitude    | Latitude coordinates of the property | float64
+longitude    | Longitude coordinates of the property | float64
+structure_tax    | Tax value of the structure itself in dollars | float64
+land_tax_value    | Tax value of the land in dollars | float64
+tax_value    | Tax value of the entire property | float64
+tax_paid    | Tax value paid | float64
+census_tb    | Census tract and block | float64
+
 
 Engineered Features  | Description   | Data Type
 --|--|--
 county |    Derrived from fips, denotes the actual county of a home    | object
-tax_rate |    tax rate of a property, derrived from (taxamount / tax_value) * 100 |    float64
-
+yearly_tax |    Tax paid per year |    float64
+tax_rate |    tax rate of a property, derrived from (yearly_tax / tax_value) * 100 |    float64
+month_sold |    tax rate of a property, derrived from (yearly_tax / tax_value) * 100 |    float64
 
 
 ## Hypotheses:
@@ -40,7 +58,7 @@ tax_rate |    tax rate of a property, derrived from (taxamount / tax_value) * 10
 - [x] Create repo on github to save all files related to the project.
 - [x] Create README.md with goals, initial hypotheses, data dictionary, and outline plans for the project in a trello board.
 - [x] Acqiure zillow data using acquire.py file drawing directly from Codeups `zillow` database with SQL queries. Create functions for use in conjunction with prepare.py.
-- [] Clean, tidy, and encode data in such a way that it is usable in a machine learning algorithm. Includes dropping unneccesary columns, creating dummies where needed and changing string values to numeric values and getting rid of outliers
+- [x] Clean, tidy, and encode data in such a way that it is usable in a machine learning algorithm. Includes dropping unneccesary columns, creating dummies where needed and changing string values to numeric values and getting rid of outliers
 - [] Utilize recursive feature elimination and clustering algorithms to search the data for meaningful driving features of log error.
 - [] Create hypotheses based on preliminary statistical tests
 - [] Test hypotheses with tests such as t-test, chi-squared to determine the viability of said hypotheses by comparing p-values to alpha.

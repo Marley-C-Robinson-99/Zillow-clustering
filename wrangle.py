@@ -36,7 +36,7 @@ def acquire_zillow():
     if os.path.isfile(filename):
         return pd.read_csv(filename)
     else:
-        sql = """
+        sql = '''
         SELECT prop.*,
             pred.logerror,
             pred.transactiondate,
@@ -63,7 +63,7 @@ def acquire_zillow():
         LEFT JOIN typeconstructiontype construct USING (typeconstructiontypeid)
         WHERE  prop.latitude IS NOT NULL
             AND prop.longitude IS NOT NULL
-        """
+        '''
         df = pd.read_sql(sql, url, index_col='id')
         df.to_csv(filename, index=False)
         return df
@@ -82,29 +82,36 @@ def handle_missing_values(df, prop_required_column = .5, prop_required_row = .70
     return df
 
 def remove_columns(df, cols_to_remove):
-	'''
-    Helper function to drop a list of columns from a dataframe
-    '''
-    df = df.drop(columns=cols_to_remove)
+    '''Helper function to drop a list of columns from a dataframe'''
+    df = df.drop(columns= cols_to_remove)
     return df
 
-def outlier_function(df, cols, k):
-	'''
-    Helper function to detect and handle oulier using IQR rule
+def remove_outliers(df, k):
+    ''' remove outliers from a list of columns in a dataframe 
+        and return that dataframe
     '''
-    for col in df[cols]:
-        q1 = df.annual_income.quantile(0.25)
-        q3 = df.annual_income.quantile(0.75)
-        iqr = q3 - q1
-        upper_bound =  q3 + k * iqr
-        lower_bound =  q1 - k * iqr
-        df = df[(df[col] < upper_bound) & (df[col] > lower_bound)]
-    return df
+    cols = []
+    for col, vals in df.iteritems():
+        if df[f'{col}'].dtype != object:
+            cols.append(col)
+    
+    for col in cols:
+
+        q1, q3 = df[col].quantile([.25, .75])  # get quartiles
+        
+        iqr = q3 - q1   # calculate interquartile range
+        
+        upper_bound = q3 + k * iqr   # get upper bound
+        lower_bound = q1 - k * iqr   # get lower bound
+
+        # return dataframe without outliers
+        
+        df = df[(df[col] > lower_bound) & (df[col] < upper_bound)]
+        
+        return df
 
 def month_sold(df):
-    '''
-    Creates a month sold feature based on sale_date
-    '''
+    '''Creates a month sold feature based on sale_date'''
     # Converting date to string for splitting in month_sold function
     df['sale_date'] = df['sale_date'].astype(str)
 
@@ -123,10 +130,9 @@ def month_sold(df):
     return df
 
 def yearly_tax(df):
-    ''' 
-    Creates a rounded yearly_tax feature.
-    Equation = tax value / (current year - year built)
-    '''
+    '''Creates a rounded yearly_tax feature.
+    Equation = tax value / (current year - year built)'''
+    
     # Getting current year
     curr_year = int(f'{str(date.today())[:4]}')
 
@@ -134,6 +140,7 @@ def yearly_tax(df):
     df['yearly_tax'] = df.tax_value / (curr_year - df.year_built)
 
     df.yearly_tax = round(df.yearly_tax.astype(float), 0)
+    return df
 
 def impute_year(df):   
     '''
@@ -169,6 +176,7 @@ def wrangle_zillow():
     
     df = acquire_zillow()
 
+
     # Restrict df to only properties that meet single use criteria
     single_use = [261, 262, 263, 264, 268, 273, 276, 279]
     df = df[df.propertylandusetypeid.isin(single_use)]
@@ -201,7 +209,9 @@ def wrangle_zillow():
          'censustractandblock',
          'propertylandusedesc',
          'fips',
-         'yearbuilt']
+         'yearbuilt',
+         'unitcnt',
+         'assessmentyear']
     
     df = remove_columns(df, dropcols)
     
@@ -211,7 +221,7 @@ def wrangle_zillow():
                               'calculatedfinishedsquarefeet':'home_area',
                               'taxvaluedollarcnt':'tax_value', 
                               'transactiondate':'sale_date',
-                              'taxamount':'yearly_tax',
+                              'taxamount':'tax_paid',
                               'rawcensustractandblock':'census_tb',
                               'structuretaxvaluedollarcnt':'structure_tax',
                               'landtaxvaluedollarcnt':'land_tax_value',
@@ -220,17 +230,16 @@ def wrangle_zillow():
                               'regionidcity':'city_id',
                               'regionidcounty':'county_id',
                               'lotsizesquarefeet':'lot_area',
-                              'buildingqualitytypeid':'quality_id',
-                              'assessmentyear':'year_assessed'})
+                              'buildingqualitytypeid':'quality_id'})
+
+    # Create yearly_tax col
+    df = yearly_tax(df)
 
     # Create tax_rate col
     df = tax_rate(df)
 
     # Create Month_sold col
-    month_sold(df)
-
-    # replace nulls in unitcnt with 1
-    df.unitcnt.fillna(1, inplace = True)
+    df = month_sold(df)
 
     # assume that since this is Southern CA, null means 'None' for heating system
     df.heating_type.fillna('None', inplace = True)
@@ -243,13 +252,29 @@ def wrangle_zillow():
     df = df[df.tax_value < 5_000_000]
     df = df[df.home_area < 8000]
 
-    # Removing outliers with func
-    # df = outlier_function(df, [outlier_cols], k)
-
     # Just to be sure we caught all nulls, drop them here
     df = df.dropna()
 
+    # Dropping entry from 2018
+    wrong_date = df[df.sale_date == '2018-05-25']
+    df.drop(wrong_date.index, inplace = True)
+
+    # Remove outliers
+    df = remove_outliers(df, 1)
+
+    # Changing dtypes of vars where needed
+    df.quality_id = df.quality_id.astype(int)
+    df.city_id = df.city_id.astype(int)
+    df.zip_code = df.zip_code.astype(int)
+    df.county_id = df.county_id.astype(int)
+    df.county_id = df.county_id.astype(int)
+    df.roomcnt = df.roomcnt.astype(int)
+    df.year_built = df.year_built.astype(int)
+    df.city_id = df.city_id.astype(int)
+    
+    df = df.drop(columns = 'sale_date')
     return df
+
 
 def train_validate_test_split(df, target = None, seed=1312):
     '''
@@ -282,7 +307,7 @@ def train_validate_test_split(df, target = None, seed=1312):
                                     test_size=0.2, 
                                     random_state=seed)
         X_train, X_validate, y_train, y_validate  = train_test_split(X_train_validate, y_train_validate, 
-                                    test_size=.25, 
+                                    test_size=0.3, 
                                     random_state=seed)
         return X_train, X_validate, X_test, y_train, y_validate, y_test
 

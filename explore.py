@@ -7,8 +7,11 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from scipy import stats
-import sklearn.preprocessing
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+
 import seaborn as sns
 import numpy as np
 
@@ -16,17 +19,21 @@ import numpy as np
 
 def separate_feats(df):
     ''' 
-    Creates a combination of all possible features as well as separates quant vars and cat vars
+    Creates a combination of all possible features as well as separates quant vars and cat vars.
+
+    Outputs, in this order, list of all features, categorical features, quantitative features
     '''
 
-    # Filters for non-object and categorical vars
-    cat_feats = [col for col in df.columns if (df[f'{col}'].dtype != object) & (df[f'{col}'].nunique() <= 8)] 
+    cat_feats = []
+    for col in df.columns:
+        if (df[col].dtype == object) | (df[col].dtype == 'uint8') | (df[col].nunique() <= 12):
+            cat_feats.append(col)
 
     # Filters for quantitative variables
-    quant_feats = [col for col in df.columns if (df[f'{col}'].dtype != object) & (df[f'{col}'].nunique() > 8)]
+    quant_feats = [col for col in df.columns if col not in cat_feats]
 
     # General features that are not objects
-    feats = [col for col in df.columns if df[f'{col}'].dtype != object]
+    feats = [col for col in df.columns]
 
     return feats, cat_feats, quant_feats
 
@@ -38,7 +45,6 @@ def pairing(df):
     '''
     # Separating features
     feats, cat_feats, quant_feats = separate_feats(df)
-    dummy_feats = separate_feats(df[[]])
 
 
     # Creating raw pairs of all features
@@ -79,29 +85,24 @@ def hist_combos(df):
     '''
     feats, cat_feats, quant_feats = separate_feats(df)
     
-    plt.figure(figsize=(16, 3))
-
-    for i, feat in enumerate(feats):
-
-        # i starts at 0, but plot nos should start at 1
-        plot_number = i + 1 
-
-        # Create subplot.
-        plt.subplot(1, len(feats), plot_number)
-
-        # Title with column name.
-        plt.title(feat)
-
-        # Display histogram for column.
-        df[feat].hist(bins=5)
-
-        # Hide gridlines.
-        plt.grid(False)
     
-        # turn off scientific notation
-        plt.ticklabel_format(useOffset=False)
-    plt.tight_layout()
-    plt.show()
+    
+    for feat in feats:
+        if (df[feat].dtype != object):
+            plt.figure(figsize=(7, 5))
+            # Title with column name.
+            plt.title(feat)
+
+            # Display histogram for column.
+            df[feat].hist(bins=5)
+
+            # Hide gridlines.
+            plt.grid(False)
+        
+            # Hide scientific notation
+            plt.ticklabel_format(style='plain')
+            plt.tight_layout()
+            plt.show()
 
 
 def relplot_pairs(df):
@@ -178,31 +179,66 @@ def heatmap_combos(df):
             print(f'Heatmap features: {combo}')
             print('_____________________________________________')
 
+def encode_cols(train, validate, test, col_list):
+    '''Function to preform one hot encoding on a list of columns in train, validate and test datasets '''
+    encoded_train = pd.get_dummies(data = train, columns = col_list)
+    encoded_validate = pd.get_dummies(data = validate, columns = col_list)
+    encoded_test = pd.get_dummies(data = test, columns = col_list)
 
-def scaling(train, validate, test, scaler_type = sklearn.preprocessing.MinMaxScaler()):
-    """
-    Takes in train, validate and test dfs
-    Returns scaler, train_scaled, validate_scaled, test_scaled dfs
-    """
-    # Lists all columns with int or float dtypes
-    num_vars = list(train.select_dtypes('number').columns)
+    return encoded_train, encoded_validate, encoded_test
 
+
+def scaling(train, validate, test, scaler_type = MinMaxScaler()):
+    """
+    Takes in train, validate and test dfs or arrays
+    Returns scaler, train_scaled, validate_scaled, test_scaled dfs/arrays
+    """
     # Chooses scaler to use
     scaler = scaler_type
 
-    train[num_vars] = scaler.fit_transform(train[num_vars], index = train.index, columns = train.columns)
-    valid[num_vars] = scaler.transform(valid[num_vars], index = validate.index, columns = validate.column)
-    test[num_vars] = scaler.transform(test[num_vars], index = test.index, columns = test.columns)
+    # Checking for if train is an array or not
+    if len(train.shape) > 1:
+        feats, cat_feats, quant_feats = separate_feats(train)
+        # Lists all object vars in cat feats
+        obj_vars = []
+        for col in train.columns:
+            matches = [match for match in cat_feats if match == col]
+            for match in matches:
+                if (train[match].dtype == object) | (train[match].dtype == 'uint8'):
+                    obj_vars.append(col)
+        num_vars = [col for col in train.columns if col not in obj_vars]
+        
+        
+        
+        train_scaled = train.copy()
+        validate_scaled = validate.copy()
+        test_scaled = test.copy()
+
+        # Scaling
+        train_scaled[num_vars] = scaler.fit_transform(train_scaled[num_vars])
+        validate_scaled[num_vars] = scaler.transform(validate_scaled[num_vars])
+        test_scaled[num_vars] = scaler.transform(test_scaled[num_vars])
+
+        return scaler, train_scaled, validate_scaled, test_scaled
+    else:
+        train_scaled = train.copy()
+        validate_scaled = validate.copy()
+        test_scaled = test.copy()
+        
+        # Scaling
+        train_scaled = scaler.fit_transform(train_scaled)
+        validate_scaled = scaler.transform(validate_scaled)
+        test_scaled = scaler.transform(test_scaled)
     
-    return scaler, train_scaled, validate_scaled, test_scaled
+        return scaler, train_scaled, validate_scaled, test_scaled
 
 ###################################         EXPOLORE FUNCS         ###################################
 
 def plot_categorical_and_continuous_vars(train, validate, test):
     ''' 
-    Takes in train, validate and testcales data and plots numerous visualizations
+    Takes in scaled train, validate and testcales data and plots numerous visualizations
     '''
-    df = scaling(train, validate, test)[0]
+    df = train
     print('Histograms for each feature')
     hist_combos(df)
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
@@ -248,7 +284,47 @@ def explore_multivariate(train, target, cat_vars, quant_vars):
     plot_all_continuous_vars(train, target, quant_vars)
     plt.show()    
 
+def co_linearity(df, target, cat_vars):
+    '''returns a df of all p values and chi2
+    scores based on the specified categorical variables and target'''
+    cat = cat_vars.copy()
+    cat.remove(target)
+    
+    chi2s = []
+    p_score = []
+    pdf = pd.DataFrame(columns = ['feature', 'p_values', 'chi2'])
+    pdf['feature'] = list(cat)
+    
+    for i, var in enumerate(cat):
+        observed = pd.crosstab(df[cat_vars[i]], df[target])
+        chi2, p, degf, expected = stats.chi2_contingency(observed)
+        p_score.append(p)
+        chi2s.append(chi2)
+    
+    pdf['p_values'] = p_score
+    pdf['chi2'] = chi2s
+    pdf = pdf.sort_values(['p_values'], ascending = [True])
+    return pdf.reset_index(drop = True)
 
+def pearsons(df, target, quant_vars):
+    '''Preforms pearsons r tests on each quant_var against target'''
+    quant = quant_vars.copy()
+    quant.remove(target)
+
+    corrs = []
+    p_score = []
+    pdf = pd.DataFrame(columns = ['feature', 'p_values', 'corr'])
+    pdf['feature'] = list(quant)
+    
+    for var in quant:
+        corr, p = stats.pearsonr(df[target], df[var])
+        p_score.append(p)
+        corrs.append(corr)
+    
+    pdf['p_values'] = p_score
+    pdf['corr'] = corrs
+    pdf = pdf.sort_values(['p_values'], ascending = [True])
+    return pdf.reset_index(drop = True)
 ### Univariate
 
 def explore_univariate_categorical(train, cat_var):
@@ -257,10 +333,11 @@ def explore_univariate_categorical(train, cat_var):
     a frequency table and barplot of the frequencies. 
     '''
     frequency_table = freq_table(train, cat_var)
-    plt.figure(figsize=(2,2))
+    plt.figure(figsize=(5,5))
     sns.barplot(x=cat_var, y='Count', data=frequency_table, color='lightseagreen')
     plt.title(cat_var)
     plt.show()
+
     print(frequency_table)
 
 def explore_univariate_quant(train, quant_var):
@@ -293,7 +370,7 @@ def freq_table(train, cat_var):
                       'Count': train[cat_var].value_counts(normalize=False), 
                       'Percent': round(train[cat_var].value_counts(normalize=True)*100,2)}
                     )
-    )
+    ).reset_index(drop=True)
     return frequency_table
 
 
