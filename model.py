@@ -87,6 +87,27 @@ def lin_reg(X_train, X_validate, X_test, y_train, y_validate, y_test, x, y, mode
         dfs[f'{feature}_test'] = X_test_scaled[f'{feature}_test']
 
     # Creating ŷ predictions column
+    if model == PolynomialFeatures():
+        X_train_scaled = model.fit_transform(dft)
+        X_validate_scaled = model.transform(dfv)
+        X_test_scaled = model.transform(dfs)
+
+        lm = LinearRegression(normalize=True)
+        lm.fit(dft, y_train[y])
+        dft['yhat_train'] = lm.predict(dft)
+        yhat_train = dft['yhat_train']
+        dft[f'{y}_train'] = y_train[y]
+
+        dfv['yhat_validate'] = lm.predict(dfv)
+        yhat_validate = dfv['yhat_validate']
+        dfv[f'{y}_validate'] = y_validate[y]
+
+        dfs['yhat_test'] = lm.predict(dfs)
+        yhat_test = dfs['yhat_test']
+        dfs[f'{y}_test'] = y_test[y]
+
+        model = lm
+    
     model.fit(dft, y_train[y])
 
     dft['yhat_train'] = model.predict(dft)
